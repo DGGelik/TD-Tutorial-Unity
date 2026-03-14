@@ -41,3 +41,115 @@ public class HealthBarUI : MonoBehaviour
     }
 }
 ```
+
+
+
+```csharp
+using UnityEngine;
+
+public class TowerController : MonoBehaviour   // ← или как называется твой скрипт на башне
+{
+    [Header("UI для продажи/улучшения")]
+    [SerializeField] private GameObject upgradeSellCanvas;   // ← перетащи сюда Canvas с кнопками
+
+    private bool isPanelOpen = false;
+
+    // ===================================================================
+    // 1. Показываем панель ПРИ НАЖАТИИ мыши (не при наведении!)
+    // ===================================================================
+    private void OnMouseDown()
+    {
+        if (upgradeSellCanvas == null) return;
+
+        isPanelOpen = !isPanelOpen;                    // переключаем (кликнул → открыл, кликнул ещё раз → закрыл)
+        upgradeSellCanvas.SetActive(isPanelOpen);
+
+        // Если хочешь, чтобы панель закрывалась при клике на другую башню — добавь в Update проверку
+    }
+
+    // ===================================================================
+    // 2. Кнопка "Продать"
+    // ===================================================================
+    public void SellTower()
+    {
+        // 65% возврата от базовой стоимости (можно потом улучшить)
+        int refund = Mathf.RoundToInt(data.baseCost * 0.65f);
+        BuildManager.main.AddGold(refund);
+
+        Destroy(gameObject);           // удаляем башню
+    }
+
+    // ===================================================================
+    // 3. Кнопка "Улучшить" (заглушка — потом заменишь на свою логику)
+    // ===================================================================
+    public void UpgradeTower()
+    {
+        // Пример простой логики улучшения
+        if (data.currentLevel < data.maxLevel)
+        {
+            int cost = data.upgradeCost;                 // предполагаем, что в твоём data есть upgradeCost
+
+            if (BuildManager.main.HasEnoughGold(cost))
+            {
+                BuildManager.main.SpendGold(cost);
+
+                // Увеличиваем уровень и характеристики
+                data.currentLevel++;
+                damage *= 1.4f;          // +40% урона (можно менять)
+                range  *= 1.2f;          // +20% радиуса
+
+                Debug.Log($"Башня улучшена до уровня {data.currentLevel}");
+
+                // Можно закрыть панель после улучшения
+                upgradeSellCanvas.SetActive(false);
+                isPanelOpen = false;
+            }
+            else
+            {
+                Debug.Log("Недостаточно золота для улучшения!");
+            }
+        }
+        else
+        {
+            Debug.Log("Башня уже на максимальном уровне!");
+        }
+    }
+
+    // ===================================================================
+    // Дополнительно: закрытие панели при клике вне башни (по желанию)
+    // ===================================================================
+    private void Update()
+    {
+        if (isPanelOpen && Input.GetMouseButtonDown(0))
+        {
+            // Проверяем, кликнули ли мы по другой башне или по пустому месту
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (Physics2D.Raycast(ray.origin, ray.direction).collider == null ||
+                Physics2D.Raycast(ray.origin, ray.direction).collider.gameObject != gameObject)
+            {
+                upgradeSellCanvas.SetActive(false);
+                isPanelOpen = false;
+            }
+        }
+    }
+}
+```
+
+### Что нужно сделать в Unity:
+
+1. На префабе башни (`ArcherTower.prefab`) создай дочерний **Canvas** (World Space)  
+   - Назови его `UpgradeSellCanvas`  
+   - Поставь Scale `(0.01, 0.01, 1)`  
+   - Добавь два **Button**:
+     - Кнопка **Sell** → OnClick → TowerController → SellTower()
+     - Кнопка **Upgrade** → OnClick → TowerController → UpgradeTower()
+
+2. Перетащи этот Canvas в поле `upgradeSellCanvas` в инспекторе башни.
+
+3. Сохрани префаб.
+
+Теперь:
+- Кликнул ЛКМ по башне → появляется панель с двумя кнопками  
+- Кликнул ещё раз по той же башне → панель исчезает  
+- Кликнул мимо → панель тоже исчезает (благодаря Update)
+
