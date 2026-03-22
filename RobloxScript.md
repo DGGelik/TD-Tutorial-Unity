@@ -1,0 +1,137 @@
+Вот пример скрипта для твоей «летающей тарелки» с двумя движениями:
+
+- **постоянное вращение** вокруг вертикальной оси (круг с сиденьями крутится)
+- **плавное покачивание / наклон** в стороны (на шарнире, как будто тарелка немного качается из стороны в сторону)
+
+Предполагаем такую структуру модели:
+
+```
+FlyingSaucer (Model)
+├─ CentralCylinder (Part — центральный цилиндр, Anchored = true)
+├─ Platform (Part/Mesh — круглая платформа с сиденьями, Anchored = false)
+├─ HingeTilt (HingeConstraint)  ← для качания в стороны
+│   ├─ Attachment0 (в CentralCylinder, смотри вверх)
+│   └─ Attachment1 (в Platform, смотри вверх)
+└─ RotationMotor (CylinderConstraint или HingeConstraint)  ← для вращения по Y
+    ├─ Attachment0 (в CentralCylinder или в невидимой неподвижной части)
+    └─ Attachment1 (в Platform, в центре)
+```
+
+### Скрипт (ServerScript внутри модели FlyingSaucer)
+
+```lua
+-- ServerScriptService → FlyingSaucer → Script
+
+local RunService = game:GetService("RunService")
+
+local model     = script.Parent
+local platform  = model:WaitForChild("Platform")
+
+local hingeTilt = platform:FindFirstChild("HingeTilt")     -- HingeConstraint для качания
+local motorRot  = platform:FindFirstChild("RotationMotor") -- CylinderConstraint или HingeConstraint для вращения
+
+if not hingeTilt or not motorRot then
+    warn("Не найдены HingeTilt или RotationMotor!")
+    return
+end
+
+-- ────────────────────────────────────────────────
+-- Настройки
+-- ────────────────────────────────────────────────
+
+local SPIN_SPEED_RPM     =  18      -- обороты в минуту (постоянное вращение)
+local TILT_MAX_ANGLE     =  12      -- максимальный наклон в градусах (±12°)
+local TILT_PERIOD        =  5.8     -- период одного качания туда-обратно (сек)
+local TILT_SMOOTHNESS    =  0.92    -- насколько плавно меняется скорость наклона (1 = мгновенно, <1 = инерция)
+
+-- ────────────────────────────────────────────────
+-- Постоянное вращение (очень просто)
+-- ────────────────────────────────────────────────
+
+local spinRadPerSec = SPIN_SPEED_RPM * (2 * math.pi / 60)
+
+if motorRot:IsA("CylinderConstraint") or motorRot:IsA("HingeConstraint") then
+    motorRot.ActuatorType     = Enum.ActuatorType.Motor
+    motorRot.AngularVelocity  = spinRadPerSec
+    motorRot.AngularSpeed     = spinRadPerSec   -- на всякий случай
+    motorRot.MotorMaxTorque   = 1e6             -- сильно, чтобы не тормозило
+else
+    warn("RotationMotor должен быть CylinderConstraint или HingeConstraint!")
+end
+
+-- ────────────────────────────────────────────────
+-- Плавное качание (синусоида + инерция)
+-- ────────────────────────────────────────────────
+
+local currentTiltVel   = 0
+local timePassed       = 0
+
+RunService.Heartbeat:Connect(function(dt)
+    timePassed += dt
+
+    -- желаемый угол по синусоиде
+    local targetAngle = TILT_MAX_ANGLE * math.sin(timePassed * (2 * math.pi / TILT_PERIOD))
+
+    -- разница между желаемым и текущим
+    local error = targetAngle - hingeTilt.CurrentAngle
+
+    -- желаемая скорость
+    local targetVel = error * 15   -- коэффициент жёсткости (15–25 обычно хорошо)
+
+    -- плавно подгоняем текущую скорость
+    currentTiltVel = currentTiltVel * TILT_SMOOTHNESS + targetVel * (1 - TILT_SMOOTHNESS)
+
+    -- применяем
+    hingeTilt.AngularVelocity = currentTiltVel
+end)
+
+print("Летающая тарелка запущена: вращение", SPIN_SPEED_RPM, "об/мин + качание ±", TILT_MAX_ANGLE, "°")
+```
+
+### Вариант 2 — если хочешь более резкие / дискретные качания (как в первом твоём скрипте)
+
+```lua
+-- Альтернатива: качание импульсами (туда-сюда)
+
+local MAX_TILT       = 14
+local TILT_SPEED     = 0.9     -- рад/с целевая
+local STEP           = 0.018
+local STOP_THRESHOLD = 0.04
+
+local function accelerateTilt(dir)
+    local target = dir * TILT_SPEED
+    while math.abs(hingeTilt.CurrentAngle) < MAX_TILT do
+        if math.abs(hingeTilt.AngularVelocity) < math.abs(target) then
+            hingeTilt.AngularVelocity += dir * STEP
+        end
+        task.wait()
+    end
+end
+
+local function decelerateTilt()
+    while math.abs(hingeTilt.AngularVelocity) > STOP_THRESHOLD do
+        hingeTilt.AngularVelocity *= 0.90
+        task.wait()
+    end
+    hingeTilt.AngularVelocity = 0
+end
+
+task.spawn(function()
+    while true do
+        accelerateTilt( 1)
+        decelerateTilt()
+        accelerateTilt(-1)
+        decelerateTilt()
+        task.wait(1.2)   -- пауза между полными качаниями
+    end
+end)
+```
+
+### Полезные советы
+
+- **HingeTilt** должен быть настроен так, чтобы ось вращения была **горизонтальной** (обычно по X или Z).
+- Attachments в HingeTilt должны смотреть **вверх** (Front вектор вдоль оси Y).
+- Если платформа слишком лёгкая — добавь **массу** (CustomPhysicalProperties) или увеличь **MotorMaxTorque**.
+- Чтобы игроки не слетали при качании — можно поставить **Sit-сиденья** или невидимые **WeldConstraint** во время аттракциона (но это уже отдельная механика).
+
+Удачи с аттракционом! 🛸
