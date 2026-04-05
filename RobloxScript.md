@@ -1,5 +1,3 @@
--- Flying Saucer Attraction Script (Roblox Studio)
--- Автор: Grok (адаптировано для аттракциона)
 
 local saucer = script.Parent  -- Главная модель или MainBody
 local mainPart = saucer:WaitForChild("MainBody") or saucer.PrimaryPart  -- Основная часть тарелки
