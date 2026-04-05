@@ -1,3 +1,59 @@
+-- Flying Saucer Attraction Script (Roblox Studio)
+-- Автор: Grok (адаптировано для аттракциона)
+
+local saucer = script.Parent  -- Главная модель или MainBody
+local mainPart = saucer:WaitForChild("MainBody") or saucer.PrimaryPart  -- Основная часть тарелки
+
+-- Настройки (меняй под себя)
+local rotationSpeed = 2.5          -- Скорость вращения вокруг своей оси (чем больше — быстрее)
+local flightRadius = 20            -- Радиус круга полёта (в studs)
+local flightHeight = 40            -- Средняя высота полёта
+local flightSpeed = 0.8            -- Скорость движения по кругу (медленнее = плавнее)
+local upDownAmplitude = 5          -- Амплитуда "качки" вверх-вниз
+local upDownSpeed = 1.2            -- Скорость качки
+
+local RunService = game:GetService("RunService")
+
+-- Создаём constraints один раз (современный способ вместо старых Body*)
+local angularVelocity = Instance.new("AngularVelocity")
+angularVelocity.Attachment0 = mainPart:FindFirstChild("CenterAttachment") or Instance.new("Attachment", mainPart)
+angularVelocity.MaxTorque = math.huge
+angularVelocity.AngularVelocity = Vector3.new(0, rotationSpeed, 0)  -- Вращение только по Y (вокруг вертикали)
+angularVelocity.Parent = mainPart
+
+local linearVelocity = Instance.new("LinearVelocity")
+linearVelocity.Attachment0 = angularVelocity.Attachment0
+linearVelocity.MaxForce = math.huge
+linearVelocity.Parent = mainPart
+
+-- Время для синусоиды (для плавного движения)
+local timeOffset = 0
+
+RunService.Heartbeat:Connect(function(dt)
+    timeOffset += dt * flightSpeed
+    
+    -- Позиция по кругу + лёгкая качка вверх-вниз
+    local x = math.sin(timeOffset) * flightRadius
+    local z = math.cos(timeOffset) * flightRadius
+    local y = flightHeight + math.sin(timeOffset * upDownSpeed) * upDownAmplitude
+    
+    local targetPosition = Vector3.new(x, y, z)  -- Центр круга в (0, flightHeight, 0). Если хочешь центр в другом месте — добавь offset.
+    
+    -- Плавно двигаем тарелку
+    linearVelocity.VectorVelocity = (targetPosition - mainPart.Position) * 10  -- Чем больше множитель — тем резче реакция
+    
+    -- Дополнительно можно поворачивать тарелку "носом" по направлению движения (опционально)
+    -- mainPart.CFrame = CFrame.lookAt(mainPart.Position, targetPosition) * CFrame.Angles(0, math.rad(90), 0) -- подкрути если нужно
+end)
+
+print("Летающая тарелка запущена! Вращение и полёт активны.")
+
+
+
+
+
+
+
 Вот пример скрипта для твоей «летающей тарелки» с двумя движениями:
 
 - **постоянное вращение** вокруг вертикальной оси (круг с сиденьями крутится)
