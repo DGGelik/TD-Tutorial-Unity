@@ -31,5 +31,4 @@ public class WaveConfig : ScriptableObject
     public WaveData[] waves;
 }
 
-
-а тимур не умеет пользовать гитхабом)
+тимур хочет научиться пользоваться гитом, что ему для этого надо???
