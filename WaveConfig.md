@@ -30,3 +30,6 @@ public class WaveConfig : ScriptableObject
 
     public WaveData[] waves;
 }
+
+
+а тимур не умеет пользовать гитхабом)
